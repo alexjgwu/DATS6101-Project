@@ -7,10 +7,8 @@
 from faker import Faker
 import pandas as pd
 import random
-from pathlib import Path
 import logging
 import datetime
-import sqlalchemy
 from sqlalchemy import create_engine
 from sqlalchemy import text
 import time
@@ -46,8 +44,8 @@ genres = [
 ]
 
 moods = [
-    "Excited", "Bored", "Intrigued",
-    "Shocked", "Frightened", "Disgusted"
+    "excited", "bored", "intrigued",
+    "shocked", "frightened", "disgusted"
 ]
 
 # Helper: sometimes return None (so CSV cells are empty)
@@ -275,7 +273,7 @@ for n in range(sessions_case3):
         "genre": "Action",
         "platform": random.choice(platforms),
         "runtime": runtime,
-        "mood": mood_selector(expected_moods = 0, manual_set = "Excited"),
+        "mood": mood_selector(expected_moods = 0, manual_set = "excited"),
         "pause_min" : pause_selector(runtime, pause_counts = random.randint(0, 7))
     })
 
@@ -349,17 +347,20 @@ def test_query(query, engine, updating_table = None):
     if updating_table is not None:
         delete_query = text(f"DELETE FROM {updating_table}")
         reset_query = text(f"INSERT INTO {updating_table} SELECT * FROM {updating_table}_base")
+        count_query = text(f"SELECT COUNT(*) from {updating_table}")
     
         with engine.begin() as conn:
             start = time.perf_counter()
             conn.execute(query)
             end = time.perf_counter()
-            logging.info("Update Complete")
+            result = conn.execute(count_query)
+            logging.info(f"Update Complete, new {updating_table} count: {result.scalar()}")
 
         with engine.begin() as conn:
             conn.execute(delete_query)
             conn.execute(reset_query)
-            logging.info("Data Refreshed")
+            result = conn.execute(count_query)
+            logging.info(f"Data Refreshed, {updating_table} count: {result.scalar()}")
     
     else:
         with engine.connect() as conn:
@@ -378,8 +379,17 @@ def test_running(query, engine, test_task, run_size = 10, updating_table = None)
         times.append(time)
         logging.info(f"Run {n + 1} time: {time}")
     logging.info(f"Average time for {test_task}: {sum(times) / len(times)}")
-
     
+    # resetting watch_sessions table as well since it auto deletes on customers deletion
+    if updating_table == 'customers':
+        delete_query = text("DELETE FROM watch_sessions")
+        reset_query = text("INSERT INTO watch_sessions SELECT * FROM watch_sessions_base")
+        with engine.begin() as conn:
+            conn.execute(delete_query)
+            conn.execute(reset_query)
+            result = conn.execute(text("SELECT COUNT(*) FROM watch_sessions"))
+            logging.info(f"Reset watch_sessions after customers update tests, watch_sessions row count {result.scalar()}")
+
 
 
 # Task 1: Update first pause minute for a session
@@ -456,10 +466,10 @@ task_6_query = text(
     AND email IS NOT NULL;
     """
 )
-
 test_running(task_6_query, engine = engine, test_task = "Task 6")
 
 # Task 7: Delete sessions with no moods recorded
+
 
 task_7_query = text(
     """
