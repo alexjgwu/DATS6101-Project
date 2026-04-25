@@ -1,7 +1,10 @@
 # python code
 # ------------------------------------------------------------
-# IDs are simple unique strings you generate here, and
-# appointments re-use those IDs to link the collections.
+# One bundle of code that generates fake data (consistent due to seeding)
+# Then sets up MYSQL d
+# b, and imports data straight from python into DB
+# NOTE: MAKE SURE THAT MYSQL IS RUNNING ON COMPUTER, AND ADJUST CREDENTIALS WHERE NECESSARY
+# Then runs query tests
 # ------------------------------------------------------------
 
 from faker import Faker
