@@ -173,8 +173,6 @@ def generate_sessions(customers_df, size):
         })
 
     df = pd.DataFrame(sessions)
-    df = split_list_column(df, "mood")
-    df = split_list_column(df, "pause_min", fill_value=0)
 
     return df
 

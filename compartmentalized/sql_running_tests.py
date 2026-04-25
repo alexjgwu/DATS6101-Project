@@ -48,7 +48,7 @@ def test_running(query, name, runs=5, updating_table=None):
 
     logging.info(f"Average: {sum(times)/len(times):.4f}s\n")
 
-    # 🔥 CRITICAL FIX: reset dependent table if customers modified
+    # reset dependent table if customers modified
     if updating_table == "customers":
         delete_ws = text("DELETE FROM watch_sessions")
         reset_ws = text("INSERT INTO watch_sessions SELECT * FROM watch_sessions_base")
