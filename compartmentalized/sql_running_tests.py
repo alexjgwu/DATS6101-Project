@@ -9,7 +9,7 @@ engine = create_engine("mysql+mysqlconnector://root:@localhost/moviesdb_sql")
 
 def test_query(query, updating_table=None):
     if updating_table:
-        delete_query = text(f"DELETE FROM {updating_table}")
+        delete_query = text(f"TRUNCATE TABLE {updating_table}")
         reset_query = text(f"INSERT INTO {updating_table} SELECT * FROM {updating_table}_base")
         count_query = text(f"SELECT COUNT(*) FROM {updating_table}")
 
@@ -22,8 +22,10 @@ def test_query(query, updating_table=None):
 
         # reset table
         with engine.begin() as conn:
+            conn.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
             conn.execute(delete_query)
             conn.execute(reset_query)
+            conn.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
             result = conn.execute(count_query)
             logging.info(f"{updating_table} reset to: {result.scalar()}")
 
@@ -36,7 +38,7 @@ def test_query(query, updating_table=None):
     return end - start
 
 
-def test_running(query, name, runs=5, updating_table=None):
+def test_running(query, name, runs=30, updating_table=None):
     times = []
 
     logging.info(f"Running {name}")
@@ -50,7 +52,7 @@ def test_running(query, name, runs=5, updating_table=None):
 
     # reset dependent table if customers modified
     if updating_table == "customers":
-        delete_ws = text("DELETE FROM watch_sessions")
+        delete_ws = text("TRUNCATE TABLE watch_sessions")
         reset_ws = text("INSERT INTO watch_sessions SELECT * FROM watch_sessions_base")
 
         with engine.begin() as conn:

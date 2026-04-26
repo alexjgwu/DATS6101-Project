@@ -90,31 +90,54 @@ def load_sql_data(engine, customers_df, sessions_df):
         conn.exec_driver_sql("DROP TABLE IF EXISTS customers_base")
         conn.exec_driver_sql("DROP TABLE IF EXISTS watch_sessions_base")
         conn.execute(text("CREATE TABLE customers_base AS SELECT * FROM customers"))
+        logging.info("customers_base made as static copy of customers table")
         conn.execute(text("CREATE TABLE watch_sessions_base AS SELECT * FROM watch_sessions"))
+        logging.info("watch_sessions base made as static copy of watch_sessions table")
         conn.commit()
     
 
 def load_mongo_data(db = None, customers_df = None, sessions_df = None):
     customers = db["customers"]
     watch_sessions = db["watch_sessions"]
+    customers_base = db["customers_base"]
+    watch_sessions_base = db["watch_sessions_base"]
 
     # dropping collections if already existing
     customers.drop()
     watch_sessions.drop()
+    customers_base.drop()
+    watch_sessions_base.drop()
 
     #
+    customers_df["_id"] = customers_df["customer_id"]
+    customers_df = customers_df.drop(columns = ["customer_id"])
     customers_records = customers_df.to_dict(orient = "records")
     customers.insert_many(customers_records)
     cust_count = customers.count_documents({})
     logging.info(f"Customers loaded into moviesdb_mongo. Count in customers collection: {cust_count}")
 
+    sessions_df["_id"] = sessions_df["session_id"]
+    sessions_df = sessions_df.drop(columns = "session_id")
     watch_sessions_records = sessions_df.to_dict(orient = "records")
     watch_sessions.insert_many(watch_sessions_records)
     sess_count = watch_sessions.count_documents({})
     logging.info(f"Customers loaded into moviesdb_mongo. Count in watch_sessions collection: {sess_count}")
 
+    customers.aggregate([
+        {'$match' : {}},
+        {'$out': 'customers_base'}
+    ])
 
-    return None
+    cust_base_count = customers_base.count_documents({})
+    logging.info(f"customers_base made on mongo_db, counts in copy: {cust_base_count}")
+
+    watch_sessions.aggregate([
+        {'$match' : {}},
+        {'$out': 'watch_sessions_base'}
+    ])
+    sess_base_count = watch_sessions_base.count_documents({})
+    logging.info(f"watch_sessions_base made on mongo_db, counts in copy {sess_base_count}")
+
 
 
 
