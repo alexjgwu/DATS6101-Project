@@ -7,8 +7,8 @@ import pandas as pd
 logging.basicConfig(level=logging.INFO)
 
 
-SQL_DB_URI_ROOT = "mysql+mysqlconnector://root:@localhost/"
-SQL_DB_URI_DB = "mysql+mysqlconnector://root:@localhost/moviesdb_sql"
+SQL_DB_URI_ROOT = "mysql+mysqlconnector://root:12345678@localhost/"
+SQL_DB_URI_DB = "mysql+mysqlconnector://root:12345678@localhost/moviesdb_sql"
 
 
 def setup_sql_db():

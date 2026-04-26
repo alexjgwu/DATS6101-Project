@@ -27,7 +27,7 @@ def test_query(query, refresh=None):
 
     return end - start
 
-def test_running(query, name, runs=30, refresh=None):
+def test_running(query, name, runs=10, refresh=None):
     times = []
 
     logging.info(f"Running {name}")

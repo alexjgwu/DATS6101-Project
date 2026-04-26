@@ -4,7 +4,7 @@ from sqlalchemy import create_engine, text
 
 logging.basicConfig(level=logging.INFO)
 
-engine = create_engine("mysql+mysqlconnector://root:@localhost/moviesdb_sql")
+engine = create_engine("mysql+mysqlconnector://root:12345678@localhost/moviesdb_sql")
 
 
 def test_query(query, updating_table=None):
@@ -38,7 +38,7 @@ def test_query(query, updating_table=None):
     return end - start
 
 
-def test_running(query, name, runs=30, updating_table=None):
+def test_running(query, name, runs=10, updating_table=None):
     times = []
 
     logging.info(f"Running {name}")
