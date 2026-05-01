@@ -1,8 +1,10 @@
 import time
 import logging
+import inspect
+import textwrap
 from pymongo import MongoClient
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.WARNING)
 
 # Connect to MongoDB
 client = MongoClient('mongodb://localhost:27017/')
@@ -12,43 +14,97 @@ customers_base = db["customers_base"]
 watch_sessions = db["watch_sessions"]
 watch_sessions_base = db["watch_sessions_base"]
 
+
 def test_query(query, refresh=None):
+    # for calculating query time
     if refresh is not None:
         start = time.perf_counter()
         query()
         end = time.perf_counter()
-        refresh()  
-
+        refresh()
     else:
         start = time.perf_counter()
         result = query()
-        list(result)
+        try:
+            list(result)
+        except TypeError:
+            pass
         end = time.perf_counter()
 
     return end - start
 
-def test_running(query, name, runs=10, refresh=None):
+
+def test_running(query_func, name, runs=10, refresh=None):
+    """
+    for screenshot
+    """
+    print(f"\n{'=' * 60}")
+    print(f"[{name}]")
+
+    # print code
+    q_lines, _ = inspect.getsourcelines(query_func)
+    orgcode = "".join(q_lines[1:])
+    print(f"Query Logic:\n{textwrap.dedent(orgcode).strip()}")
+    print("-" * 30)
+
+    # define target_collection
+    target_collection = None
+    if refresh == refresh_customers:
+        target_collection = customers
+    elif refresh == refresh_sessions:
+        target_collection = watch_sessions
+
+    # excute 1 time for result
+    if target_collection is not None:
+        before_count = target_collection.count_documents({})
+        res = query_func()
+
+        # get count of rows influenced
+        affected = "N/A (Multi-step or unreturned)"
+        if hasattr(res, 'modified_count'):
+            affected = res.modified_count
+        elif hasattr(res, 'deleted_count'):
+            affected = res.deleted_count
+
+        after_count = target_collection.count_documents({})
+
+        print(f"Result (Action on '{target_collection.name}'):")
+        print(f"  -> Documents Affected: {affected}")
+        print(f"  -> Collection Count: {before_count} (Before) -> {after_count} (After)")
+
+        refresh()
+    else:
+        res = query_func()
+        res_list = list(res) if type(res) is not list else res
+        print(f"Result (Total {len(res_list)} documents, showing first 3):")
+        for i, row in enumerate(res_list[:3]):
+            print(f"  Doc {i + 1}: {row}")
+
+    print("-" * 30)
+    print("Execution Times:")
+
+    # excute time calculate
     times = []
-
-    logging.info(f"Running {name}")
-
     for i in range(runs):
-        t = test_query(query, refresh)
+        t = test_query(query_func, refresh)
         times.append(t)
-        logging.info(f"Run {i+1}: {t:.4f}s")
+        print(f"  Run {i + 1:<2}: {t:.4f}s")
+    avg_time = sum(times) / len(times)
+    print(f"  Average: {avg_time:.4f}s")
+    print(f"{'=' * 60}\n")
 
-    logging.info(f"Average: {sum(times)/len(times):.4f}s\n")
 
-# ---------------- Table Updates ----------------
+# refresh tables
 def refresh_customers():
     customers_base.aggregate([
-        {'$match' : {}},
+        {'$match': {}},
         {'$out': 'customers'}
     ])
+    refresh_sessions()
 
 def refresh_sessions():
     watch_sessions_base.aggregate([
-        {'$match' : {}},
+        {'$match': {}},
         {'$out': 'watch_sessions'}
     ])
 

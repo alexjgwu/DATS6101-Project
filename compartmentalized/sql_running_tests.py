@@ -2,32 +2,29 @@ import time
 import logging
 from sqlalchemy import create_engine, text
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.WARNING)
 
 engine = create_engine("mysql+mysqlconnector://root:12345678@localhost/moviesdb_sql")
 
 
 def test_query(query, updating_table=None):
+    """
+    just for calculate query time
+    """
     if updating_table:
         delete_query = text(f"TRUNCATE TABLE {updating_table}")
         reset_query = text(f"INSERT INTO {updating_table} SELECT * FROM {updating_table}_base")
-        count_query = text(f"SELECT COUNT(*) FROM {updating_table}")
 
         with engine.begin() as conn:
             start = time.perf_counter()
             conn.execute(query)
             end = time.perf_counter()
-            result = conn.execute(count_query)
-            logging.info(f"{updating_table} count after update: {result.scalar()}")
 
-        # reset table
         with engine.begin() as conn:
             conn.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
             conn.execute(delete_query)
             conn.execute(reset_query)
             conn.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
-            result = conn.execute(count_query)
-            logging.info(f"{updating_table} reset to: {result.scalar()}")
 
     else:
         with engine.connect() as conn:
@@ -39,18 +36,55 @@ def test_query(query, updating_table=None):
 
 
 def test_running(query, name, runs=10, updating_table=None):
+    """
+    for making report screenshot
+    """
+    print(f"\n{'='*60}")
+    print(f"[{name}]")
+    print(f"Query:\n{query.text.strip()}")
+    print("-" * 30)
+
+    # run one time for showing result
+    with engine.begin() as conn:
+        if updating_table:
+            # update/delete count& influenced row is ok
+            before_count = conn.execute(text(f"SELECT COUNT(*) FROM {updating_table}")).scalar()
+            result = conn.execute(query)
+            affected_rows = result.rowcount
+            after_count = conn.execute(text(f"SELECT COUNT(*) FROM {updating_table}")).scalar()
+
+            print(f"Result (Action on '{updating_table}'):")
+            print(f"  -> Rows Affected: {affected_rows}")
+            print(f"  -> Table Count verification: {before_count} (Before) -> {after_count} (After)")
+
+            # reset table
+            conn.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
+            conn.execute(text(f"TRUNCATE TABLE {updating_table}"))
+            conn.execute(text(f"INSERT INTO {updating_table} SELECT * FROM {updating_table}_base"))
+            conn.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
+        else:
+            # for select only 3 rows for screenshot as first part of task
+            result = conn.execute(query).fetchall()
+            print(f"Result (Total {len(result)} rows, showing first 3):")
+            for i, row in enumerate(result[:3]):
+                print(f"  Row {i+1}: {row}")
+
+    print("-" * 30)
+    print("Execution Times:")
+
+    # excute time
     times = []
-
-    logging.info(f"Running {name}")
-
     for i in range(runs):
         t = test_query(query, updating_table)
         times.append(t)
-        logging.info(f"Run {i+1}: {t:.4f}s")
+        print(f"  Run {i+1:<2}: {t:.4f}s")
 
-    logging.info(f"Average: {sum(times)/len(times):.4f}s\n")
+    # average time
+    avg_time = sum(times) / len(times)
+    print(f"  Average: {avg_time:.4f}s")
+    print(f"{'='*60}\n")
 
-    # reset dependent table if customers modified
+    # reset table
     if updating_table == "customers":
         delete_ws = text("TRUNCATE TABLE watch_sessions")
         reset_ws = text("INSERT INTO watch_sessions SELECT * FROM watch_sessions_base")
@@ -58,8 +92,6 @@ def test_running(query, name, runs=10, updating_table=None):
         with engine.begin() as conn:
             conn.execute(delete_ws)
             conn.execute(reset_ws)
-            result = conn.execute(text("SELECT COUNT(*) FROM watch_sessions"))
-            logging.info(f"watch_sessions reset after customers test: {result.scalar()}")
 
 
 # ---------------- TASKS ----------------
